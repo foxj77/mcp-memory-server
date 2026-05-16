@@ -1,12 +1,15 @@
 name: Build and Publish
 
+# Triggered when release-please merges a release PR and creates a GitHub
+# Release. Builds a multi-arch image and pushes it to GHCR with full SemVer
+# tags (e.g. 1.2.3, 1.2, 1, latest) plus a sha- tag for traceability.
+#
+# Can also be triggered manually via workflow_dispatch for ad-hoc builds
+# (these receive only sha- and 'edge' tags, not SemVer or latest).
+
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - Dockerfile
-      - .github/workflows/publish.yaml
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -44,9 +47,22 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=ref,event=branch
+            # SemVer tags from the release tag (e.g. v1.2.3 → 1.2.3, 1.2, 1)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref_name, 'v0.') }}
+            # 'latest' only on published releases, not manual dispatches
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            # 'edge' on manual dispatches so they are never confused with releases
+            type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' }}
+            # Always include a sha tag for traceability
             type=sha,format=short,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+          labels: |
+            org.opencontainers.image.title=mcp-memory-server
+            org.opencontainers.image.description=Persistent shared knowledge graph memory for AI agents over MCP Streamable HTTP
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
 
       - name: Build and push
         uses: docker/build-push-action@v6

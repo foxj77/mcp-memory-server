@@ -1,0 +1,74 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this repo is
+
+A thin packaging project — no application source code. It builds a container image that wraps the upstream `@modelcontextprotocol/server-memory` (stdio) with `supergateway` to expose it as an MCP **Streamable HTTP** endpoint suitable for Kubernetes workloads. The knowledge graph is persisted to `/data/memory.jsonl` on a mounted volume.
+
+The entire runtime is two `npm install -g` packages plus a single `CMD` line — there is no application build step or lint config. Changes are almost always to `Dockerfile`, `examples/*.yaml`, `README.md`, or `tests/smoke-test.sh`.
+
+## Build / run / test
+
+```bash
+# Local build + run
+docker build -t mcp-memory-server .
+docker run -p 3000:3000 -v $(pwd)/data:/data mcp-memory-server
+
+# Smoke test (exercises all 7 MCP tools, verifies responses, then cleans up)
+./tests/smoke-test.sh
+
+# Against a remote deployment
+MCP_URL=http://mcp-memory-server.my-namespace.svc.cluster.local:3000/mcp ./tests/smoke-test.sh
+```
+
+Requires `curl` and `jq`. The test is idempotent — safe to re-run against a live graph as it uses `smoke-test/` prefixed entity names and cleans up after itself.
+
+Images are published to `ghcr.io/foxj77/mcp-memory-server` by `.github/workflows/publish.yaml` on pushes to `main` that touch `Dockerfile` or the workflow itself. Multi-arch (amd64 + arm64). README/manifest-only changes do NOT trigger a rebuild — if you need a new image after editing only docs, push a Dockerfile change or run the workflow manually (`workflow_dispatch`).
+
+## Critical configuration constraints
+
+These are non-obvious and have already bitten this project — preserve them when editing `Dockerfile` or example manifests:
+
+- **`--stateful` on supergateway is required.** Stateless mode spawns a new stdio child per HTTP request, which breaks MCP's `initialize` → `tools/call` session continuity. Do not remove this flag.
+- **Memory limit ≥ 768Mi.** Two Node processes run in the container (supergateway + the memory server child); 512Mi OOMKills under load. `NODE_OPTIONS=--max-old-space-size=256` caps each heap.
+- **`imagePullPolicy: Always`** is needed in example manifests because they reference mutable tags (`:latest` / `:main`). Kubernetes' default `IfNotPresent` would serve a stale cached image after a new build.
+- **`--outputTransport streamableHttp`** is the transport kagent and most modern MCP clients expect. SSE is legacy.
+
+## Commit messages — conventional commits (required)
+
+All commits **must** follow the [Conventional Commits](https://www.conventionalcommits.org/) spec. `release-please` reads commit history to determine the next SemVer version and generate the changelog automatically — non-conforming commits are silently ignored by the tool and will not appear in release notes.
+
+| Prefix | Changelog section | Version bump |
+|--------|-------------------|-------------|
+| `feat:` | Features | minor |
+| `fix:` | Bug Fixes | patch |
+| `perf:` | Performance | patch |
+| `docs:` | Documentation | patch |
+| `refactor:` | Refactors | patch |
+| `chore:` | (hidden) | patch |
+| `feat!:` or `BREAKING CHANGE:` footer | Features | major |
+
+Examples:
+```
+feat: expose SSE transport as an alternative to streamableHttp
+fix: prevent OOMKill by capping NODE_OPTIONS heap at 256Mi
+docs: add kubectl port-forward example to smoke test instructions
+chore: update supergateway to latest minor release
+```
+
+## Release process
+
+Releases are fully automated via `release-please`:
+
+1. Merge conventional commits to `main` → `release-please.yaml` creates or updates a **release PR** that bumps `version.txt` and `CHANGELOG.md`.
+2. Merge the release PR → release-please creates a **GitHub Release** with the SemVer tag (e.g. `v1.2.0`) and an auto-generated changelog.
+3. The published release event triggers `publish.yaml` → builds multi-arch image and pushes to GHCR with tags `1.2.0`, `1.2`, `1`, `latest`, and `sha-<short>`.
+
+Manual image builds (no release, no version bump) can be triggered via `workflow_dispatch` — these receive `edge` and `sha-` tags only.
+
+## Repo conventions
+
+- Update `CLAUDE.md` and any relevant docs in the same commit as code changes — never leave docs stale.
+- When changing the `Dockerfile` CMD or supergateway flags, mirror the change in `README.md` (Architecture / Key configuration notes section) and in any affected `examples/*.yaml`.
+- The Kubernetes manifest in `README.md` and `examples/kubernetes-deployment.yaml` must stay in sync.

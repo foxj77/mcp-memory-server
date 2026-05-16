@@ -141,6 +141,98 @@ spec:
 
 </details>
 
+## Verifying your deployment
+
+`tests/smoke-test.sh` exercises all seven MCP tools against a running server and shows you exactly what is being stored and retrieved at each step. Run it after any deployment to confirm the server is healthy and the knowledge graph is persisting correctly.
+
+### Prerequisites
+
+```bash
+# macOS
+brew install curl jq
+
+# Debian / Ubuntu
+apt-get install -y curl jq
+```
+
+Then clone this repository (or just download the script) so you have `tests/smoke-test.sh` locally:
+
+```bash
+git clone https://github.com/foxj77/mcp-memory-server.git
+cd mcp-memory-server
+```
+
+### Running against a local Docker container
+
+Start the container, then run the test:
+
+```bash
+docker run -d -p 3000:3000 -v $(pwd)/data:/data ghcr.io/foxj77/mcp-memory-server:latest
+./tests/smoke-test.sh
+```
+
+### Running against a Kubernetes deployment
+
+**Option A — port-forward** (no in-cluster networking required):
+
+```bash
+kubectl port-forward -n my-namespace svc/mcp-memory-server 3000:3000 &
+./tests/smoke-test.sh
+kill %1   # stop the port-forward when done
+```
+
+**Option B — in-cluster URL** (from a machine that can reach cluster services directly, or from a pod inside the cluster):
+
+```bash
+MCP_URL=http://mcp-memory-server.my-namespace.svc.cluster.local:3000/mcp \
+  ./tests/smoke-test.sh
+```
+
+### What the test does
+
+The script runs 10 steps, printing what is stored and retrieved at each one:
+
+| Step | Tool | What it verifies |
+|------|------|-----------------|
+| 1 | `initialize` | Session handshake succeeds and returns a session ID |
+| 2 | `tools/list` | All 7 tools are registered |
+| 3 | *(cleanup)* | Removes any leftover data from a previous run |
+| 4 | `create_entities` | Two entities written to the graph with initial observations |
+| 5 | `add_observations` | New facts appended to an existing entity without overwriting |
+| 6 | `create_relations` | A typed edge created between two entities |
+| 7 | `search_nodes` | Full-text search returns the correct entity |
+| 8 | `open_nodes` | Entity retrieved by name; accumulated observations are all present |
+| 9 | `read_graph` | Full graph returned with correct entity and relation counts |
+| 10 | `delete_entities` | Test data removed; graph restored to its previous state |
+
+### Expected output
+
+```
+━━ 1  Initialize session
+  → Connecting to http://localhost:3000/mcp
+✓ Session established (id: abc123…)
+
+━━ 2  List tools
+✓ 7 tools registered
+  → create_entities, create_relations, add_observations, search_nodes, open_nodes, read_graph, delete_entities
+
+...
+
+━━ 8  open_nodes
+✓ smoke-test/deployment has 4 observations (3 initial + 1 appended)
+  → "replicas: 3"
+  → "image: my-app:v1.2.0"
+  → "namespace: production"
+  → "memory limit raised to 768Mi after OOMKill incident"
+
+...
+
+────────────────────────────────────────
+All 10 tests passed. The memory server is working correctly.
+```
+
+The test uses `smoke-test/` prefixed entity names and deletes them on exit, so it is safe to run against a live graph that already holds real data.
+
 ## Wiring to kagent
 
 See [`examples/kagent-remote-mcp-server.yaml`](examples/kagent-remote-mcp-server.yaml) for the full manifest. Register the server as a `RemoteMCPServer` and add the tools to each agent's tool list.
@@ -244,13 +336,18 @@ graph LR
 
 ## Image
 
-Pre-built multi-arch images (amd64 + arm64) are published to GHCR on every push to `main`:
+Pre-built multi-arch images (amd64 + arm64) are published to GHCR automatically when a GitHub Release is created. Releases are driven by [Conventional Commits](https://www.conventionalcommits.org/) — `feat:` bumps the minor version, `fix:` / `docs:` / `chore:` bump the patch, and `feat!:` bumps the major.
 
 ```
-ghcr.io/foxj77/mcp-memory-server:latest
-ghcr.io/foxj77/mcp-memory-server:main
-ghcr.io/foxj77/mcp-memory-server:sha-<short-sha>
+ghcr.io/foxj77/mcp-memory-server:1.2.3       # exact version (immutable)
+ghcr.io/foxj77/mcp-memory-server:1.2         # latest patch for 1.2.x
+ghcr.io/foxj77/mcp-memory-server:1           # latest minor for 1.x (omitted for 0.x)
+ghcr.io/foxj77/mcp-memory-server:latest      # latest stable release
+ghcr.io/foxj77/mcp-memory-server:sha-<sha>   # exact commit (every build)
+ghcr.io/foxj77/mcp-memory-server:edge        # manual workflow_dispatch build (not a release)
 ```
+
+For production use, pin to the exact version tag (`1.2.3`) or the minor tag (`1.2`) rather than `latest` to avoid unexpected upgrades. See [GitHub Releases](https://github.com/foxj77/mcp-memory-server/releases) for the full changelog.
 
 ## Licence
 
