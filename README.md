@@ -10,12 +10,11 @@ Every AI agent invocation starts with a blank context window. This service gives
 
 ```mermaid
 graph TD
-    A[Agent A<br/>resolver] -->|MCP tools/call| M
-    B[Agent B<br/>analyst] -->|MCP tools/call| M
-    C[Agent C<br/>advisor] -->|MCP tools/call| M
-    M[mcp-memory-server<br/>Streamable HTTP :3000/mcp]
-    M -->|stdio| S[@modelcontextprotocol/server-memory]
-    S -->|read/write| J[knowledge graph<br/>JSONL file]
+    A[Agent A] -->|MCP tools/call| M[mcp-memory-server]
+    B[Agent B] -->|MCP tools/call| M
+    C[Agent C] -->|MCP tools/call| M
+    M -->|stdio| S[server-memory]
+    S -->|read/write| J[knowledge graph JSONL]
     J -->|mounted from| P[(persistent volume)]
 ```
 
@@ -209,15 +208,13 @@ This server composes two existing tools:
 
 ```mermaid
 graph LR
-    GW[supergateway<br/>Streamable HTTP bridge]
-    MEM[@modelcontextprotocol/server-memory<br/>knowledge graph engine]
-    GW -->|stdio| MEM
-    MEM -->|JSONL| FS[(memory.jsonl<br/>on PVC)]
+    GW[supergateway] -->|stdio| MEM[server-memory]
+    MEM -->|JSONL| FS[(memory.jsonl on PVC)]
 ```
 
 | Component | Role |
 |-----------|------|
-| [`@modelcontextprotocol/server-memory`](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | Knowledge graph implementation (entities, relations, observations) stored as JSONL |
+| [`@modelcontextprotocol/server-memory`](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | Knowledge graph implementation stored as JSONL |
 | [`supergateway`](https://github.com/supermaven-inc/supergateway) | Bridges the stdio MCP server to Streamable HTTP |
 
 ### Key configuration notes
