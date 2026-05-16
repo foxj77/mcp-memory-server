@@ -1,6 +1,6 @@
 FROM node:22-alpine
 
-RUN npm install -g @modelcontextprotocol/server-memory supergateway
+RUN npm install -g @modelcontextprotocol/server-memory@2026.1.26 supergateway@3.4.3
 
 EXPOSE 3000
 

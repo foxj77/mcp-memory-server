@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Keep GitHub Actions versions current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+
+  # Keep the npm packages in package.json (and therefore Dockerfile) current.
+  # When Dependabot raises a PR here, also update the matching version in the
+  # Dockerfile's `RUN npm install -g` line before merging.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+
+  # Keep the base image current (node:22-alpine digest)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore

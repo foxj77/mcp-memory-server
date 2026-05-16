@@ -44,6 +44,17 @@ spec:
               value: "--max-old-space-size=256"
           ports:
             - containerPort: 3000
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
           volumeMounts:
             - name: memory-store
               mountPath: /data

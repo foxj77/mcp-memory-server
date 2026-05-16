@@ -24,7 +24,9 @@ MCP_URL=http://mcp-memory-server.my-namespace.svc.cluster.local:3000/mcp ./tests
 
 Requires `curl` and `jq`. The test is idempotent — safe to re-run against a live graph as it uses `smoke-test/` prefixed entity names and cleans up after itself.
 
-Images are published to `ghcr.io/foxj77/mcp-memory-server` by `.github/workflows/publish.yaml` on pushes to `main` that touch `Dockerfile` or the workflow itself. Multi-arch (amd64 + arm64). README/manifest-only changes do NOT trigger a rebuild — if you need a new image after editing only docs, push a Dockerfile change or run the workflow manually (`workflow_dispatch`).
+Images are published to `ghcr.io/foxj77/mcp-memory-server` by `.github/workflows/publish.yaml` when a GitHub Release is created. Multi-arch (amd64 + arm64). Manual builds (no release) can be triggered via `workflow_dispatch` and receive `edge` + `sha-` tags only.
+
+**npm package versions** are pinned in both `Dockerfile` (the `RUN npm install -g` line) and `package.json` (for Dependabot). When Dependabot raises a PR bumping a version in `package.json`, the matching version in the Dockerfile must be updated in the same PR before merging.
 
 ## Critical configuration constraints
 

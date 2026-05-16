@@ -1,0 +1,65 @@
+name: Integration Test
+
+# Builds the image from the current Dockerfile, starts it, and runs the smoke
+# test against it. Catches regressions before a release PR is merged.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  smoke-test:
+    name: Build and smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (single-arch for speed)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: mcp-memory-server:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start container
+        run: |
+          docker run -d \
+            --name mcp \
+            -p 3000:3000 \
+            -v /tmp/mcp-data:/data \
+            -e NODE_OPTIONS=--max-old-space-size=256 \
+            mcp-memory-server:ci
+
+      - name: Wait for server to be ready
+        run: |
+          echo "Waiting for MCP server..."
+          for i in $(seq 1 20); do
+            if curl -sf -o /dev/null -X POST http://localhost:3000/mcp \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json, text/event-stream" \
+                -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"healthcheck","version":"1.0"}}}'; then
+              echo "Server is ready."
+              exit 0
+            fi
+            echo "  attempt $i/20 — retrying in 2s"
+            sleep 2
+          done
+          echo "Server did not become ready in time."
+          docker logs mcp
+          exit 1
+
+      - name: Run smoke test
+        run: MCP_URL=http://localhost:3000/mcp ./tests/smoke-test.sh
+
+      - name: Print container logs on failure
+        if: failure()
+        run: docker logs mcp
