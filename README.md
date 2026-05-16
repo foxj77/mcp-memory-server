@@ -8,18 +8,15 @@ Built with [kagent](https://kagent.dev) in mind, but compatible with any agent f
 
 Every AI agent invocation starts with a blank context window. This service gives agents a shared, persistent memory they can read from and write to across invocations — structured as a knowledge graph of entities, relations, and observations.
 
-```
-Agent A (resolver)       Agent B (analyst)       Agent C (advisor)
-     |                        |                        |
-     └────────────────────────┴────────────────────────┘
-                              |
-                    MCP (Streamable HTTP)
-                              |
-                     mcp-memory-server
-                              |
-                    knowledge graph (JSONL)
-                              |
-                        persistent volume
+```mermaid
+graph TD
+    A[Agent A<br/>resolver] -->|MCP tools/call| M
+    B[Agent B<br/>analyst] -->|MCP tools/call| M
+    C[Agent C<br/>advisor] -->|MCP tools/call| M
+    M[mcp-memory-server<br/>Streamable HTTP :3000/mcp]
+    M -->|stdio| S[@modelcontextprotocol/server-memory]
+    S -->|read/write| J[knowledge graph<br/>JSONL file]
+    J -->|mounted from| P[(persistent volume)]
 ```
 
 ### Knowledge graph model
@@ -209,6 +206,14 @@ curl -s -X POST http://localhost:3000/mcp \
 ## Architecture
 
 This server composes two existing tools:
+
+```mermaid
+graph LR
+    GW[supergateway<br/>Streamable HTTP bridge]
+    MEM[@modelcontextprotocol/server-memory<br/>knowledge graph engine]
+    GW -->|stdio| MEM
+    MEM -->|JSONL| FS[(memory.jsonl<br/>on PVC)]
+```
 
 | Component | Role |
 |-----------|------|
