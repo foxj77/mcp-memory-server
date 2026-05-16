@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mcp-memory-server.fullname" . }}-store
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mcp-memory-server.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    # ReadWriteOnce is intentionally not configurable.
+    # server-memory holds an exclusive write lock on memory.jsonl. Mounting
+    # the same volume on multiple pods (ReadWriteMany) would cause concurrent
+    # writes and JSONL corruption.
+    - ReadWriteOnce
+  {{- if .Values.storage.storageClassName }}
+  storageClassName: {{ .Values.storage.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}

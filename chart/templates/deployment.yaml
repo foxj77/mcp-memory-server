@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mcp-memory-server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mcp-memory-server.labels" . | nindent 4 }}
+spec:
+  # Replicas is intentionally fixed at 1 and is not a configurable value.
+  #
+  # Two hard constraints make scaling impossible:
+  #   1. The PVC uses ReadWriteOnce — most storage classes only allow mounting
+  #      on a single node at a time, so a second replica would fail to start.
+  #   2. supergateway runs with --stateful, keeping one persistent stdio child
+  #      process. Multiple pods would each maintain a separate in-memory and
+  #      on-disk state, giving different agents an inconsistent view of the graph.
+  #
+  # If you need HA or horizontal scale, this architecture must change first
+  # (e.g. shared read-write storage + external session broker).
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "mcp-memory-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mcp-memory-server.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mcp-memory-server
+          image: {{ include "mcp-memory-server.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NODE_OPTIONS
+              # Caps the V8 heap of both Node.js processes (supergateway +
+              # server-memory child) at nodeHeapSizeMb each.
+              # Keep this value ≤ resources.limits.memory / 2.
+              value: "--max-old-space-size={{ .Values.nodeHeapSizeMb }}"
+          ports:
+            - name: mcp
+              containerPort: 3000
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: mcp
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          livenessProbe:
+            tcpSocket:
+              port: mcp
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          volumeMounts:
+            - name: memory-store
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: memory-store
+          persistentVolumeClaim:
+            claimName: {{ include "mcp-memory-server.fullname" . }}-store
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

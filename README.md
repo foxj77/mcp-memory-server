@@ -59,7 +59,66 @@ docker run -p 3000:3000 -v $(pwd)/data:/data ghcr.io/foxj77/mcp-memory-server:la
 
 The MCP endpoint is available at `http://localhost:3000/mcp`.
 
-### Kubernetes (Deployment + PVC)
+### Kubernetes — Helm (recommended)
+
+Check [GitHub Releases](https://github.com/foxj77/mcp-memory-server/releases) for the current chart version, then install:
+
+```bash
+helm install mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version 0.2.1 \
+  --namespace my-namespace \
+  --create-namespace
+```
+
+The MCP endpoint will be available at:
+```
+http://mcp-memory-server.my-namespace.svc.cluster.local:3000/mcp
+```
+
+**Common value overrides:**
+
+```bash
+# Larger graph storage and higher memory limits
+helm install mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version 0.2.1 \
+  --namespace my-namespace \
+  --create-namespace \
+  --set storage.size=10Gi \
+  --set resources.limits.memory=1Gi \
+  --set nodeHeapSizeMb=384
+```
+
+**With kagent integration** (creates a `RemoteMCPServer` in the kagent namespace automatically — see [Wiring to kagent](#wiring-to-kagent)):
+
+```bash
+helm install mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version 0.2.1 \
+  --namespace my-namespace \
+  --create-namespace \
+  --set kagent.enabled=true \
+  --set kagent.namespace=kagent
+```
+
+**Upgrading:**
+
+```bash
+helm upgrade mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version <new-version> \
+  --namespace my-namespace \
+  --reuse-values
+```
+
+**Uninstalling:**
+
+```bash
+helm uninstall mcp-memory-server --namespace my-namespace
+# The PVC is not deleted automatically — remove it manually if no longer needed:
+kubectl delete pvc memory-store --namespace my-namespace
+```
+
+See [`chart/values.yaml`](chart/values.yaml) for all available options and their inline documentation.
+
+### Kubernetes — raw manifest
 
 See [`examples/kubernetes-deployment.yaml`](examples/kubernetes-deployment.yaml) for the full manifest, or apply it directly:
 
@@ -246,6 +305,39 @@ The test uses `smoke-test/` prefixed entity names and deletes them on exit, so i
 
 ## Wiring to kagent
 
+### Via Helm (recommended)
+
+Pass `--set kagent.enabled=true` when installing. The chart creates a `RemoteMCPServer` in the kagent namespace automatically, with the URL computed from the release namespace and service name:
+
+```bash
+helm install mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version 0.2.1 \
+  --namespace my-namespace \
+  --create-namespace \
+  --set kagent.enabled=true \
+  --set kagent.namespace=kagent        # defaults to "kagent", change if yours differs
+```
+
+The `RemoteMCPServer` and the memory server live in **different namespaces** by design — kagent's controllers watch their own namespace, while the memory server can run anywhere. The URL crosses namespaces automatically via cluster DNS.
+
+To verify the `RemoteMCPServer` was registered:
+
+```bash
+kubectl get remotemcpserver -n kagent memory-mcp
+```
+
+If you installed without `kagent.enabled=true` and want to add it later:
+
+```bash
+helm upgrade mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --namespace my-namespace \
+  --reuse-values \
+  --set kagent.enabled=true \
+  --set kagent.namespace=kagent
+```
+
+### Via raw manifest
+
 See [`examples/kagent-remote-mcp-server.yaml`](examples/kagent-remote-mcp-server.yaml) for the full manifest. Register the server as a `RemoteMCPServer` and add the tools to each agent's tool list.
 
 ```yaml
@@ -345,20 +437,40 @@ graph LR
 
 **`imagePullPolicy: Always` for `:latest` / `:main` tags.** Kubernetes defaults to `IfNotPresent` for non-`:latest` tags, which will serve a cached old image after a new build. Use `Always` if you track a mutable tag.
 
+## Helm chart
+
+The chart is published to GHCR as an OCI artifact alongside every release. The chart version always matches the image version.
+
+```bash
+# Inspect default values for a given version
+helm show values oci://ghcr.io/foxj77/charts/mcp-memory-server --version 0.2.1
+
+# Show chart metadata (description, maintainers, app version)
+helm show chart oci://ghcr.io/foxj77/charts/mcp-memory-server --version 0.2.1
+
+# Pull the chart tarball locally
+helm pull oci://ghcr.io/foxj77/charts/mcp-memory-server --version 0.2.1
+```
+
+Available versions are listed on the [GitHub Releases](https://github.com/foxj77/mcp-memory-server/releases) page. OCI Helm registries do not support `helm search repo` — use the releases page to find the version you want.
+
+All configurable values are documented inline in [`chart/values.yaml`](chart/values.yaml).
+
 ## Image
 
 Pre-built multi-arch images (amd64 + arm64) are published to GHCR automatically when a GitHub Release is created. Releases are driven by [Conventional Commits](https://www.conventionalcommits.org/) — `feat:` bumps the minor version, `fix:` / `docs:` / `chore:` bump the patch, and `feat!:` bumps the major.
 
 ```
-ghcr.io/foxj77/mcp-memory-server:1.2.3       # exact version (immutable)
-ghcr.io/foxj77/mcp-memory-server:1.2         # latest patch for 1.2.x
-ghcr.io/foxj77/mcp-memory-server:1           # latest minor for 1.x (omitted for 0.x)
+ghcr.io/foxj77/mcp-memory-server:0.2.1       # exact version (immutable)
+ghcr.io/foxj77/mcp-memory-server:0.2         # latest patch for 0.2.x
 ghcr.io/foxj77/mcp-memory-server:latest      # latest stable release
 ghcr.io/foxj77/mcp-memory-server:sha-<sha>   # exact commit (every build)
 ghcr.io/foxj77/mcp-memory-server:edge        # manual workflow_dispatch build (not a release)
 ```
 
-For production use, pin to the exact version tag (`1.2.3`) or the minor tag (`1.2`) rather than `latest` to avoid unexpected upgrades. See [GitHub Releases](https://github.com/foxj77/mcp-memory-server/releases) for the full changelog.
+Note: the `major`-only tag (e.g. `1`) is omitted for `0.x` releases per semver convention — it will appear once the project reaches `1.0.0`.
+
+For production use, pin to the exact version tag (`0.2.1`) or the minor tag (`0.2`) rather than `latest` to avoid unexpected upgrades. See [GitHub Releases](https://github.com/foxj77/mcp-memory-server/releases) for the full changelog.
 
 ## Licence
 

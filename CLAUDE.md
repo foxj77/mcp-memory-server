@@ -6,7 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A thin packaging project — no application source code. It builds a container image that wraps the upstream `@modelcontextprotocol/server-memory` (stdio) with `supergateway` to expose it as an MCP **Streamable HTTP** endpoint suitable for Kubernetes workloads. The knowledge graph is persisted to `/data/memory.jsonl` on a mounted volume.
 
-The entire runtime is two `npm install -g` packages plus a single `CMD` line — there is no application build step or lint config. Changes are almost always to `Dockerfile`, `examples/*.yaml`, `README.md`, or `tests/smoke-test.sh`.
+The entire runtime is two `npm install -g` packages plus a single `CMD` line — there is no application build step or lint config. Changes are almost always to `Dockerfile`, `chart/`, `examples/*.yaml`, `README.md`, or `tests/smoke-test.sh`.
+
+### Chart layout
+
+```
+chart/
+├── Chart.yaml              # metadata; version stamped by CI at publish time
+├── values.yaml             # all tunable values with inline constraint docs
+├── values.schema.json      # JSON Schema — Helm validates values against this on install
+└── templates/
+    ├── _helpers.tpl        # name/label/image helpers
+    ├── deployment.yaml     # replicas hardcoded to 1 — see inline comment for why
+    ├── pvc.yaml            # accessMode hardcoded to ReadWriteOnce — see inline comment
+    ├── service.yaml
+    └── NOTES.txt           # post-install endpoint instructions
+```
 
 ## Build / run / test
 

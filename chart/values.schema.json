@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": { "type": "string" },
+        "tag":        { "type": "string" },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "size":             { "type": "string" },
+        "storageClassName": { "type": "string" }
+      }
+    },
+    "nodeHeapSizeMb": {
+      "type": "integer",
+      "minimum": 64,
+      "description": "Must be <= resources.limits.memory / 2. Two processes share the container."
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu":    { "type": "string" },
+            "memory": { "type": "string" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu":    { "type": "string" },
+            "memory": { "type": "string" }
+          }
+        }
+      }
+    },
+    "readinessProbe": {
+      "type": "object",
+      "properties": {
+        "initialDelaySeconds": { "type": "integer", "minimum": 0 },
+        "periodSeconds":       { "type": "integer", "minimum": 1 }
+      }
+    },
+    "livenessProbe": {
+      "type": "object",
+      "properties": {
+        "initialDelaySeconds": { "type": "integer", "minimum": 0 },
+        "periodSeconds":       { "type": "integer", "minimum": 1 },
+        "failureThreshold":    { "type": "integer", "minimum": 1 }
+      }
+    },
+    "podAnnotations": { "type": "object" },
+    "podLabels":      { "type": "object" },
+    "nodeSelector":   { "type": "object" },
+    "tolerations":    { "type": "array" },
+    "affinity":       { "type": "object" },
+    "kagent": {
+      "type": "object",
+      "properties": {
+        "enabled":        { "type": "boolean" },
+        "namespace":      { "type": "string", "minLength": 1 },
+        "serverName":     { "type": "string", "minLength": 1 },
+        "description":    { "type": "string" },
+        "timeout":        { "type": "string" },
+        "sseReadTimeout": { "type": "string" }
+      }
+    }
+  }
+}
