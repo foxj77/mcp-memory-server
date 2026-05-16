@@ -7,6 +7,11 @@ on:
   push:
     branches:
       - main
+      # Run on release-please branches so the status check is reported even
+      # though GitHub suppresses pull_request workflow triggers for PRs opened
+      # with GITHUB_TOKEN. Branch protection reads the check from the commit
+      # SHA regardless of which event produced it.
+      - 'release-please--branches--**'
   pull_request:
 
 jobs:
