@@ -5,6 +5,13 @@ Versions are managed automatically by [release-please](https://github.com/google
 
 <!-- next-release-here -->
 
+## [0.2.2](https://github.com/foxj77/mcp-memory-server/compare/v0.2.1...v0.2.2) (2026-05-16)
+
+
+### Documentation
+
+* update README with Helm install, upgrade, uninstall, and kagent wiring ([72b9d7c](https://github.com/foxj77/mcp-memory-server/commit/72b9d7cf63fed4d2ea83d7b04a9098dafa048772))
+
 ## [0.2.1](https://github.com/foxj77/mcp-memory-server/compare/v0.2.0...v0.2.1) (2026-05-16)
 
 
