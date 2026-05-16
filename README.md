@@ -274,6 +274,23 @@ The test uses `smoke-test/` prefixed entity names and deletes them on exit, so i
 
 ## Wiring to kagent
 
+### Via Helm (recommended)
+
+Pass `--set kagent.enabled=true` when installing. The chart creates a `RemoteMCPServer` in the kagent namespace automatically, with the URL computed from the release namespace and service name:
+
+```bash
+helm install mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version 0.2.0 \
+  --namespace my-namespace \
+  --create-namespace \
+  --set kagent.enabled=true \
+  --set kagent.namespace=kagent        # defaults to "kagent", change if yours differs
+```
+
+The `RemoteMCPServer` and the memory server live in **different namespaces** by design — kagent's controllers watch their own namespace, while the memory server can run anywhere. The URL crosses namespaces automatically via cluster DNS.
+
+### Via raw manifest
+
 See [`examples/kagent-remote-mcp-server.yaml`](examples/kagent-remote-mcp-server.yaml) for the full manifest. Register the server as a `RemoteMCPServer` and add the tools to each agent's tool list.
 
 ```yaml

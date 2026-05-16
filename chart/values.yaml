@@ -91,3 +91,40 @@ tolerations: []
 
 # Advanced scheduling rules (node affinity, pod affinity/anti-affinity).
 affinity: {}
+
+# kagent integration — creates a RemoteMCPServer resource so agents can
+# reference this server by name in their tool lists without hard-coding the URL.
+#
+# Enable with: --set kagent.enabled=true
+#
+# Namespace note: the RemoteMCPServer is created in kagent.namespace, NOT in
+# the namespace where this chart is installed. This is intentional — kagent's
+# controllers watch the kagent namespace for RemoteMCPServer resources, not the
+# namespace where the memory server runs. The two namespaces are fully
+# independent; the URL crosses namespaces automatically via cluster DNS.
+kagent:
+  enabled: false
+
+  # Namespace where kagent is installed. Must match where you ran:
+  #   helm install kagent oci://ghcr.io/kagent-dev/kagent/helm/kagent ...
+  # The RemoteMCPServer resource is created here, not in .Release.Namespace.
+  namespace: kagent
+
+  # Name of the RemoteMCPServer resource. Agents reference this name in their
+  # tool lists, e.g.:
+  #   mcpServer:
+  #     kind: RemoteMCPServer
+  #     name: <serverName>
+  serverName: memory-mcp
+
+  # Description shown in the kagent UI when browsing available MCP servers.
+  description: "Shared persistent knowledge graph memory"
+
+  # Timeout for individual MCP tool calls (create_entities, search_nodes, etc.).
+  # Increase if your graph is very large and read_graph is slow.
+  timeout: 30s
+
+  # Timeout for the long-lived SSE read connection used by kagent to receive
+  # streaming responses. Must be much larger than timeout — this is the
+  # connection keep-alive, not the per-call deadline.
+  sseReadTimeout: 5m0s

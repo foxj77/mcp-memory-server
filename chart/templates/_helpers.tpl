@@ -60,3 +60,13 @@ so a plain `helm upgrade` always uses the version the chart was built for.
 {{- define "mcp-memory-server.image" -}}
 {{- printf "%s:%s" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) }}
 {{- end }}
+
+{{/*
+Full in-cluster MCP endpoint URL.
+Composed from the service name, release namespace, and service port so that
+the RemoteMCPServer spec and NOTES.txt always stay in sync with the actual
+service, even when nameOverride or fullnameOverride is set.
+*/}}
+{{- define "mcp-memory-server.mcpEndpoint" -}}
+{{- printf "http://%s.%s.svc.cluster.local:%d/mcp" (include "mcp-memory-server.fullname" .) .Release.Namespace (.Values.service.port | int) }}
+{{- end }}

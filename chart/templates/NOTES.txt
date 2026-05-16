@@ -2,20 +2,72 @@ MCP Memory Server is running.
 
 The MCP Streamable HTTP endpoint is available inside the cluster at:
 
-  http://{{ include "mcp-memory-server.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/mcp
+  {{ include "mcp-memory-server.mcpEndpoint" . }}
 
 To verify the deployment:
 
-  kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "mcp-memory-server.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+  kubectl get pods -n {{ .Release.Namespace }} \
+    -l "app.kubernetes.io/name={{ include "mcp-memory-server.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
 
 To run the smoke test from your local machine (requires curl and jq):
 
   kubectl port-forward -n {{ .Release.Namespace }} \
     svc/{{ include "mcp-memory-server.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }} &
-
   MCP_URL=http://localhost:{{ .Values.service.port }}/mcp ./tests/smoke-test.sh
+{{ if .Values.kagent.enabled }}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+kagent integration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-For kagent, register the server as a RemoteMCPServer:
+A RemoteMCPServer named "{{ .Values.kagent.serverName }}" has been created in
+the "{{ .Values.kagent.namespace }}" namespace. Add it to each agent's tool
+list based on that agent's required access level:
 
-  url: http://{{ include "mcp-memory-server.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/mcp
-  protocol: STREAMABLE_HTTP
+  # Full read + write  (resolver / advisor agents)
+  - type: McpServer
+    mcpServer:
+      apiGroup: kagent.dev
+      kind: RemoteMCPServer
+      name: {{ .Values.kagent.serverName }}
+      toolNames:
+        - create_entities
+        - create_relations
+        - add_observations
+        - search_nodes
+        - open_nodes
+        - read_graph
+
+  # Observe + read  (analyst agents — can add facts, cannot restructure graph)
+  - type: McpServer
+    mcpServer:
+      apiGroup: kagent.dev
+      kind: RemoteMCPServer
+      name: {{ .Values.kagent.serverName }}
+      toolNames:
+        - add_observations
+        - search_nodes
+        - open_nodes
+        - read_graph
+
+  # Read-only  (general-purpose agents — discovery and recall only)
+  - type: McpServer
+    mcpServer:
+      apiGroup: kagent.dev
+      kind: RemoteMCPServer
+      name: {{ .Values.kagent.serverName }}
+      toolNames:
+        - search_nodes
+        - open_nodes
+        - read_graph
+
+To verify the RemoteMCPServer was registered:
+
+  kubectl get remotemcpserver -n {{ .Values.kagent.namespace }} {{ .Values.kagent.serverName }}
+{{ else }}
+To enable kagent integration (creates a RemoteMCPServer in the kagent namespace):
+
+  helm upgrade {{ .Release.Name }} oci://ghcr.io/foxj77/charts/mcp-memory-server \
+    --reuse-values \
+    --set kagent.enabled=true \
+    --set kagent.namespace=<your-kagent-namespace>
+{{ end }}

@@ -93,6 +93,30 @@ jobs:
             --set podAnnotations."prometheus\.io/scrape"=true \
             > /dev/null
 
+      - name: Template chart (kagent enabled)
+        run: |
+          helm template mcp-memory-server chart/ --namespace test \
+            --set kagent.enabled=true \
+            --set kagent.namespace=kagent \
+            --set kagent.serverName=memory-mcp \
+            > /tmp/kagent-render.yaml
+          # Assert the RemoteMCPServer resource is present with the correct namespace
+          grep -q "kind: RemoteMCPServer" /tmp/kagent-render.yaml
+          grep -q "namespace: kagent"     /tmp/kagent-render.yaml
+          grep -q "name: memory-mcp"      /tmp/kagent-render.yaml
+          grep -q "STREAMABLE_HTTP"        /tmp/kagent-render.yaml
+          echo "kagent template assertions passed"
+
+      - name: Template chart (kagent disabled — assert no RemoteMCPServer)
+        run: |
+          helm template mcp-memory-server chart/ --namespace test \
+            > /tmp/no-kagent-render.yaml
+          if grep -q "kind: RemoteMCPServer" /tmp/no-kagent-render.yaml; then
+            echo "RemoteMCPServer should not appear when kagent.enabled=false"
+            exit 1
+          fi
+          echo "RemoteMCPServer correctly absent when kagent disabled"
+
       - name: Validate schema rejects invalid values
         run: |
           if helm template mcp-memory-server chart/ \
