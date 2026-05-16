@@ -5,6 +5,13 @@ Versions are managed automatically by [release-please](https://github.com/google
 
 <!-- next-release-here -->
 
+## [0.2.1](https://github.com/foxj77/mcp-memory-server/compare/v0.2.0...v0.2.1) (2026-05-16)
+
+
+### Bug Fixes
+
+* allow workflow_dispatch to publish versioned Docker + Helm artifacts ([0909dfc](https://github.com/foxj77/mcp-memory-server/commit/0909dfc7551657a8002c930b5746e7689b110be7))
+
 ## [0.2.0](https://github.com/foxj77/mcp-memory-server/compare/v0.1.0...v0.2.0) (2026-05-16)
 
 
