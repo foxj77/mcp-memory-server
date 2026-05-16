@@ -1,7 +1,8 @@
 name: Integration Test
 
 # Builds the image from the current Dockerfile, starts it, and runs the smoke
-# test against it. Catches regressions before a release PR is merged.
+# test against it. Also lints and templates the Helm chart.
+# Catches regressions before a release PR is merged.
 
 on:
   push:
@@ -63,3 +64,40 @@ jobs:
       - name: Print container logs on failure
         if: failure()
         run: docker logs mcp
+
+  helm-test:
+    name: Helm lint and template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint chart/
+
+      - name: Template chart (default values)
+        run: helm template mcp-memory-server chart/ --namespace test > /dev/null
+
+      - name: Template chart (custom values)
+        run: |
+          helm template mcp-memory-server chart/ --namespace test \
+            --set image.tag=0.1.0 \
+            --set storage.size=5Gi \
+            --set storage.storageClassName=fast-ssd \
+            --set resources.limits.memory=1Gi \
+            --set nodeHeapSizeMb=384 \
+            --set service.type=LoadBalancer \
+            --set podAnnotations."prometheus\.io/scrape"=true \
+            > /dev/null
+
+      - name: Validate schema rejects invalid values
+        run: |
+          if helm template mcp-memory-server chart/ \
+            --set service.type=InvalidType > /dev/null 2>&1; then
+            echo "Schema validation should have rejected InvalidType"
+            exit 1
+          fi
+          echo "Schema validation correctly rejected invalid service type"

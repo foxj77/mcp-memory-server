@@ -59,7 +59,35 @@ docker run -p 3000:3000 -v $(pwd)/data:/data ghcr.io/foxj77/mcp-memory-server:la
 
 The MCP endpoint is available at `http://localhost:3000/mcp`.
 
-### Kubernetes (Deployment + PVC)
+### Kubernetes — Helm (recommended)
+
+```bash
+helm install mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version 0.2.0 \
+  --namespace my-namespace \
+  --create-namespace
+```
+
+The MCP endpoint will be available at:
+```
+http://mcp-memory-server.my-namespace.svc.cluster.local:3000/mcp
+```
+
+Common overrides:
+
+```bash
+# Larger graph storage and higher memory limits
+helm install mcp-memory-server oci://ghcr.io/foxj77/charts/mcp-memory-server \
+  --version 0.2.0 \
+  --namespace my-namespace \
+  --set storage.size=10Gi \
+  --set resources.limits.memory=1Gi \
+  --set nodeHeapSizeMb=384
+```
+
+See [`chart/values.yaml`](chart/values.yaml) for all available options and their inline documentation.
+
+### Kubernetes — raw manifest
 
 See [`examples/kubernetes-deployment.yaml`](examples/kubernetes-deployment.yaml) for the full manifest, or apply it directly:
 
@@ -344,6 +372,19 @@ graph LR
 **Memory limit: 768Mi minimum.** Two Node.js processes run inside the container (supergateway + the memory server child process), each needing ~256MB heap. 512Mi OOMKills under load. Set `NODE_OPTIONS=--max-old-space-size=256` to cap each process.
 
 **`imagePullPolicy: Always` for `:latest` / `:main` tags.** Kubernetes defaults to `IfNotPresent` for non-`:latest` tags, which will serve a cached old image after a new build. Use `Always` if you track a mutable tag.
+
+## Helm chart
+
+The chart is published to GHCR as an OCI artifact alongside every release:
+
+```bash
+# List available versions
+helm search repo oci://ghcr.io/foxj77/charts/mcp-memory-server
+
+# Pull and inspect
+helm pull oci://ghcr.io/foxj77/charts/mcp-memory-server --version 0.2.0
+helm show values oci://ghcr.io/foxj77/charts/mcp-memory-server --version 0.2.0
+```
 
 ## Image
 

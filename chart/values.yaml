@@ -1,0 +1,93 @@
+image:
+  repository: ghcr.io/foxj77/mcp-memory-server
+  # Tag defaults to the chart's appVersion when left empty.
+  # Pin to an exact version tag (e.g. "0.2.0") in production to avoid
+  # unexpected upgrades. Avoid mutable tags like "latest" in conjunction
+  # with imagePullPolicy: IfNotPresent — Kubernetes will not pull a new
+  # image if one with that tag is already cached on the node.
+  tag: ""
+  # Use IfNotPresent with immutable version tags (recommended).
+  # Switch to Always only if you are tracking a mutable tag such as "latest".
+  pullPolicy: IfNotPresent
+
+# Credentials for pulling from private registries. Not needed for the public
+# GHCR image. See: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+
+# Override the chart name used in resource names and labels.
+nameOverride: ""
+# Override the fully-qualified resource name. Useful when installing the same
+# chart twice in the same namespace under different release names.
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 3000
+
+storage:
+  # Size of the PersistentVolumeClaim that backs the knowledge graph file.
+  # The JSONL file grows as entities and observations accumulate. 2Gi is
+  # generous for typical agent workloads; increase if you expect a very large
+  # graph or high observation throughput.
+  size: 2Gi
+  # Leave empty to use the cluster's default StorageClass.
+  # Set explicitly (e.g. "fast-ssd") to request a specific class.
+  storageClassName: ""
+  # accessModes is intentionally not exposed as a value.
+  # ReadWriteOnce is required: the server-memory process holds an exclusive
+  # write lock on memory.jsonl. ReadWriteMany would allow concurrent pod
+  # access, which corrupts the file. Replicas are also fixed at 1 for the
+  # same reason — see the Deployment template for details.
+
+# Node.js heap size cap in MiB, applied to BOTH processes inside the container
+# (supergateway and the server-memory child) via NODE_OPTIONS.
+# Rule: nodeHeapSizeMb must be ≤ (resources.limits.memory / 2).
+# At the default of 256 MiB each process gets 256 MiB heap; together with OS
+# and npm overhead the container needs at least 512 MiB, hence the 768 MiB
+# default limit which provides headroom.
+# Increase this value if you observe "JavaScript heap out of memory" errors,
+# and raise resources.limits.memory proportionally.
+nodeHeapSizeMb: 256
+
+resources:
+  requests:
+    # 10m is sufficient at idle; the server is mostly I/O-bound on JSONL reads.
+    cpu: 10m
+    # Must cover both Node.js processes at startup before the heap cap takes
+    # effect. 256Mi matches the nodeHeapSizeMb default for a single process.
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    # Must be at least 2 × nodeHeapSizeMb plus OS/npm overhead (~256 MiB
+    # combined). Default 768 MiB = 2 × 256 MiB heap + 256 MiB headroom.
+    # Reduce with caution: 512 MiB OOMKills under moderate load.
+    memory: 768Mi
+
+# Probes use tcpSocket rather than httpGet because the MCP endpoint requires
+# a valid JSON-RPC initialize message before returning a non-error response.
+# A plain HTTP GET returns 4xx, which Kubernetes would interpret as unhealthy.
+readinessProbe:
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+livenessProbe:
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  failureThreshold: 3
+
+# Annotations added to the Pod. Useful for Prometheus scraping, Vault agent
+# injection, Datadog APM, etc.
+podAnnotations: {}
+
+# Extra labels added to the Pod. Useful for cost allocation, network policies,
+# or custom selectors.
+podLabels: {}
+
+# Constrain the pod to nodes matching these labels.
+nodeSelector: {}
+
+# Allow the pod to be scheduled on tainted nodes.
+tolerations: []
+
+# Advanced scheduling rules (node affinity, pod affinity/anti-affinity).
+affinity: {}

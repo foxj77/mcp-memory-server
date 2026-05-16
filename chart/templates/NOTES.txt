@@ -1,0 +1,21 @@
+MCP Memory Server is running.
+
+The MCP Streamable HTTP endpoint is available inside the cluster at:
+
+  http://{{ include "mcp-memory-server.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/mcp
+
+To verify the deployment:
+
+  kubectl get pods -n {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "mcp-memory-server.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+To run the smoke test from your local machine (requires curl and jq):
+
+  kubectl port-forward -n {{ .Release.Namespace }} \
+    svc/{{ include "mcp-memory-server.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }} &
+
+  MCP_URL=http://localhost:{{ .Values.service.port }}/mcp ./tests/smoke-test.sh
+
+For kagent, register the server as a RemoteMCPServer:
+
+  url: http://{{ include "mcp-memory-server.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}/mcp
+  protocol: STREAMABLE_HTTP
