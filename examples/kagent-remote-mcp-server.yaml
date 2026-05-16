@@ -1,0 +1,69 @@
+# mcp-memory-server — kagent RemoteMCPServer
+#
+# Registers the memory server as a kagent RemoteMCPServer so agents can
+# reference it by name in their tools list.
+#
+# Prerequisites:
+#   - mcp-memory-server deployed (see kubernetes-deployment.yaml)
+#   - kagent installed in your cluster
+#
+# Update the url to match the namespace you deployed the server into.
+# Apply:
+#   kubectl apply -f kagent-remote-mcp-server.yaml
+
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: memory-mcp
+  namespace: kagent
+spec:
+  description: Shared persistent knowledge graph memory for all kagent agents
+  protocol: STREAMABLE_HTTP
+  url: http://mcp-memory-server.my-namespace.svc.cluster.local:3000/mcp
+  timeout: 30s
+  sseReadTimeout: 5m0s
+---
+# Tool configuration snippets for each agent role.
+# Add the relevant block to the tools: list in your Agent CR.
+#
+# Full read + write — for agents that resolve issues or identify patterns
+# (e.g. resolver, cluster-advisor)
+#
+# - type: McpServer
+#   mcpServer:
+#     apiGroup: kagent.dev
+#     kind: RemoteMCPServer
+#     name: memory-mcp
+#     toolNames:
+#       - create_entities
+#       - create_relations
+#       - add_observations
+#       - search_nodes
+#       - open_nodes
+#       - read_graph
+#
+# Observe + read — for agents that diagnose but don't create new entities
+# (e.g. event-analyst)
+#
+# - type: McpServer
+#   mcpServer:
+#     apiGroup: kagent.dev
+#     kind: RemoteMCPServer
+#     name: memory-mcp
+#     toolNames:
+#       - add_observations
+#       - search_nodes
+#       - open_nodes
+#       - read_graph
+#
+# Read-only — for general-purpose agents that query prior context
+#
+# - type: McpServer
+#   mcpServer:
+#     apiGroup: kagent.dev
+#     kind: RemoteMCPServer
+#     name: memory-mcp
+#     toolNames:
+#       - search_nodes
+#       - open_nodes
+#       - read_graph

@@ -18,6 +18,8 @@ graph TD
     J -->|mounted from| P[(persistent volume)]
 ```
 
+This project exists because there was no straightforward way to deploy a persistent MCP memory server into Kubernetes. The official [`@modelcontextprotocol/server-memory`](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) package is excellent but speaks stdio only — not suitable for multi-agent Kubernetes workloads. This image wraps it with [supergateway](https://github.com/supermaven-inc/supergateway) to expose it over Streamable HTTP, packages everything into a single container, and publishes it to GHCR so it can be deployed with a single image reference. Ready-to-use deployment manifests are available both below and in the [`examples/`](examples/) folder of this repository.
+
 ### Knowledge graph model
 
 | Concept | Description | Example |
@@ -59,6 +61,20 @@ The MCP endpoint is available at `http://localhost:3000/mcp`.
 
 ### Kubernetes (Deployment + PVC)
 
+See [`examples/kubernetes-deployment.yaml`](examples/kubernetes-deployment.yaml) for the full manifest, or apply it directly:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/foxj77/mcp-memory-server/main/examples/kubernetes-deployment.yaml
+```
+
+The manifest creates a PVC, Deployment, and Service. The MCP endpoint will be available at:
+```
+http://mcp-memory-server.<namespace>.svc.cluster.local:3000/mcp
+```
+
+<details>
+<summary>View full manifest</summary>
+
 ```yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -89,6 +105,7 @@ spec:
       containers:
         - name: mcp-memory-server
           image: ghcr.io/foxj77/mcp-memory-server:latest
+          imagePullPolicy: Always
           env:
             - name: NODE_OPTIONS
               value: "--max-old-space-size=256"
@@ -122,11 +139,11 @@ spec:
       targetPort: 3000
 ```
 
-The MCP endpoint is available at `http://mcp-memory-server.my-namespace.svc.cluster.local:3000/mcp`.
+</details>
 
 ## Wiring to kagent
 
-Register the server as a `RemoteMCPServer` and add the tools to each agent's tool list.
+See [`examples/kagent-remote-mcp-server.yaml`](examples/kagent-remote-mcp-server.yaml) for the full manifest. Register the server as a `RemoteMCPServer` and add the tools to each agent's tool list.
 
 ```yaml
 apiVersion: kagent.dev/v1alpha2

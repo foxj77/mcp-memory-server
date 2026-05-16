@@ -1,0 +1,72 @@
+# mcp-memory-server — Kubernetes Deployment
+#
+# Creates a PVC, Deployment, and Service for the MCP memory server.
+# Replace 'my-namespace' with your target namespace before applying.
+#
+# Apply:
+#   kubectl apply -f kubernetes-deployment.yaml
+#
+# MCP endpoint after deployment:
+#   http://mcp-memory-server.<namespace>.svc.cluster.local:3000/mcp
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: memory-store
+  namespace: my-namespace
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-memory-server
+  namespace: my-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-memory-server
+  template:
+    metadata:
+      labels:
+        app: mcp-memory-server
+    spec:
+      containers:
+        - name: mcp-memory-server
+          image: ghcr.io/foxj77/mcp-memory-server:latest
+          imagePullPolicy: Always
+          env:
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=256"
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: memory-store
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 10m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+      volumes:
+        - name: memory-store
+          persistentVolumeClaim:
+            claimName: memory-store
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-memory-server
+  namespace: my-namespace
+spec:
+  selector:
+    app: mcp-memory-server
+  ports:
+    - port: 3000
+      targetPort: 3000
