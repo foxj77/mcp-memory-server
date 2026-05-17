@@ -5,6 +5,18 @@ Versions are managed automatically by [release-please](https://github.com/google
 
 <!-- next-release-here -->
 
+## [0.2.4](https://github.com/foxj77/mcp-memory-server/compare/v0.2.3...v0.2.4) (2026-05-17)
+
+
+### Bug Fixes
+
+* suppress CVE-2026-33671 in Trivy scan with documented rationale ([5cdae92](https://github.com/foxj77/mcp-memory-server/commit/5cdae920189518e30d278a8e092847b5358b64c6))
+
+
+### Documentation
+
+* make AGENTS.md redirect to CLAUDE.md to eliminate drift risk ([48fdba1](https://github.com/foxj77/mcp-memory-server/commit/48fdba139631a472376f100b28329a63ee201ab0))
+
 ## [0.2.3](https://github.com/foxj77/mcp-memory-server/compare/v0.2.2...v0.2.3) (2026-05-17)
 
 
