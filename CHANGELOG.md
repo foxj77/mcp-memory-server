@@ -5,6 +5,13 @@ Versions are managed automatically by [release-please](https://github.com/google
 
 <!-- next-release-here -->
 
+## [0.2.3](https://github.com/foxj77/mcp-memory-server/compare/v0.2.2...v0.2.3) (2026-05-17)
+
+
+### Bug Fixes
+
+* set MEMORY_FILE_PATH env var and remove silently-ignored argv path ([8761772](https://github.com/foxj77/mcp-memory-server/commit/87617721f383a76885e3c15af73119902f020910))
+
 ## [0.2.2](https://github.com/foxj77/mcp-memory-server/compare/v0.2.1...v0.2.2) (2026-05-16)
 
 
