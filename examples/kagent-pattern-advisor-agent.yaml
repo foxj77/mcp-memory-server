@@ -1,0 +1,144 @@
+---
+# Example: Pattern Advisor Agent
+#
+# An agent that analyses open issues/incidents in a system, identifies recurring
+# patterns, and persists its findings to the shared knowledge graph so that future
+# runs can build on prior context rather than starting from scratch.
+#
+# Verified memory tools used:
+#   - search_nodes   — deduplicates patterns before writing
+#   - create_entities — records ClusterPattern and UnhealthyResource nodes
+#   - create_relations — links patterns to the resources they affect
+#
+# Prerequisites:
+#   1. mcp-memory-server deployed with kagent.enabled=true (see chart values)
+#   2. A RemoteMCPServer CR named "memory-mcp" reachable in the same namespace
+#   3. A tool server that can list issues/incidents (replace github-mcp-server
+#      with whichever tool provides issue listing in your environment)
+#
+# Adjust the modelConfig, tool server names, and schedule to match your setup.
+
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: pattern-advisor
+  namespace: kagent
+spec:
+  type: Declarative
+  description: >
+    Analyses open incidents to identify recurring patterns, persists findings to
+    the shared memory graph, and produces a concise advisory summary.
+  declarative:
+    runtime: go
+    modelConfig: your-model-config   # replace with a ModelConfig CR name
+    systemMessage: |
+      You are an infrastructure pattern advisor.
+      Your job is to look across open incidents, find systemic themes,
+      persist your findings to the shared knowledge graph, then summarise.
+
+      ANALYSIS PROCEDURE:
+
+      Step 1 — Gather incidents
+        - List open incidents from your issue tracker (use your available tools).
+        - Skip auto-generated or summary-type issues.
+        - For each issue note: id, title, labels/tags, created date.
+
+      Step 2 — Identify patterns
+        - Group issues by root cause or affected component.
+        - Only treat something as a pattern if 2 or more open issues share it.
+        - A single one-off issue is not a pattern — skip it.
+
+      Step 3 — Persist findings to memory (do this BEFORE producing output)
+        You MUST complete all memory writes before writing your summary text.
+
+        a) For each pattern you identified:
+             - Call search_nodes with the pattern name to check if it already exists.
+             - If it does NOT exist, call create_entities:
+                 entities:
+                   - name: "<short pattern name> - <DD Mon YYYY>"
+                     entityType: "Pattern"
+                     observations:
+                       - "Affected: <component names>"
+                       - "Open issues: <N>"
+                       - "Root cause: <one sentence>"
+                       - "Suggested fix: <one sentence>"
+
+        b) For each component that is actively unhealthy:
+             - Call create_entities:
+                 entities:
+                   - name: "<Kind>/<namespace>/<name>"
+                     entityType: "UnhealthyResource"
+                     observations:
+                       - "Status: <observed state>"
+                       - "Since: <DD Mon YYYY>"
+
+        c) Link each pattern to the resources it affects:
+             - Call create_relations:
+                 relations:
+                   - from: "<pattern name>"
+                     to: "<resource name>"
+                     relationType: "affects"
+
+        If no patterns are found, still create one entity:
+             name: "All clear - <DD Mon YYYY>"
+             entityType: "Pattern"
+             observations:
+               - "No recurring patterns found in open incidents."
+
+        Wait for all memory writes to complete before proceeding.
+
+      Step 4 — Summarise
+        Write a concise plain-text advisory covering:
+        - Total open incidents reviewed
+        - Patterns found (or "no patterns found")
+        - For each pattern: affected components and suggested fix
+        Keep it under 400 words.
+
+    a2aConfig:
+      skills:
+        - id: advise-patterns
+          name: Advise on Patterns
+          description: >
+            Analyse open incidents, identify recurring patterns, persist findings
+            to the shared knowledge graph, and return a plain-text advisory.
+          tags:
+            - incidents
+            - patterns
+            - memory
+          examples:
+            - Identify recurring patterns across open incidents
+            - What systemic issues are we seeing this week?
+
+    deployment:
+      resources:
+        requests:
+          cpu: 20m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+    tools:
+      # Replace with the tool server(s) that list incidents in your environment.
+      # The memory tools below must remain exactly as shown.
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: your-issue-tracker-mcp-server   # replace with your tool server name
+          toolNames:
+            - list_issues     # or equivalent for your tracker
+            - search_issues   # or equivalent
+
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: memory-mcp
+          toolNames:
+            - search_nodes
+            - create_entities
+            - create_relations
+            - add_observations
+            - open_nodes
+            - read_graph
