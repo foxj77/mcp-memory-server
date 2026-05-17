@@ -5,6 +5,14 @@ Versions are managed automatically by [release-please](https://github.com/google
 
 <!-- next-release-here -->
 
+## [0.2.5](https://github.com/foxj77/mcp-memory-server/compare/v0.2.4...v0.2.5) (2026-05-17)
+
+
+### Documentation
+
+* **examples:** add pattern-advisor kagent agent example ([50cc0f4](https://github.com/foxj77/mcp-memory-server/commit/50cc0f48186509514f1f9317b23abde05b554163))
+* **examples:** add resource-health-recorder kagent agent example ([5089344](https://github.com/foxj77/mcp-memory-server/commit/508934487409721c3fbe5452f0fadce8fe0c437c))
+
 ## [0.2.4](https://github.com/foxj77/mcp-memory-server/compare/v0.2.3...v0.2.4) (2026-05-17)
 
 
