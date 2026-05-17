@@ -88,6 +88,6 @@ Manual image builds (no release, no version bump) can be triggered via `workflow
 
 ## Repo conventions
 
-- Update `CLAUDE.md` and any relevant docs in the same commit as code changes — never leave docs stale.
+- Update `CLAUDE.md` and any relevant docs in the same commit as code changes — never leave docs stale. `AGENTS.md` is a one-line redirect to this file and does not need updating.
 - When changing the `Dockerfile` CMD or supergateway flags, mirror the change in `README.md` (Architecture / Key configuration notes section) and in any affected `examples/*.yaml`.
 - The Kubernetes manifest in `README.md` and `examples/kubernetes-deployment.yaml` must stay in sync.
