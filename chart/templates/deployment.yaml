@@ -47,6 +47,11 @@ spec:
               # server-memory child) at nodeHeapSizeMb each.
               # Keep this value ≤ resources.limits.memory / 2.
               value: "--max-old-space-size={{ .Values.nodeHeapSizeMb }}"
+            - name: MEMORY_FILE_PATH
+              # server-memory reads its storage path from this env var only —
+              # argv is silently ignored by the upstream package.
+              # Must point inside the /data volume mount.
+              value: /data/memory.jsonl
           ports:
             - name: mcp
               containerPort: 3000

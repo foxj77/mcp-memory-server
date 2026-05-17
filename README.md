@@ -168,6 +168,8 @@ spec:
           env:
             - name: NODE_OPTIONS
               value: "--max-old-space-size=256"
+            - name: MEMORY_FILE_PATH
+              value: "/data/memory.jsonl"
           ports:
             - containerPort: 3000
           readinessProbe:
@@ -431,11 +433,15 @@ graph LR
 
 ### Key configuration notes
 
+**`MEMORY_FILE_PATH` is required for persistence.** The `@modelcontextprotocol/server-memory` package reads its storage path from this environment variable only — a positional argument in the command is silently ignored. The Dockerfile sets `ENV MEMORY_FILE_PATH=/data/memory.jsonl` as a default, and all deployment manifests set it explicitly. If you deploy without this variable the knowledge graph will be written to the npm package's `dist/` directory inside the container and lost on every restart.
+
 **`--stateful` is required.** In default stateless mode, supergateway spawns a new stdio child process per HTTP connection. Because MCP requires `initialize` before `tools/call` within the same session, stateless mode breaks session continuity. The `--stateful` flag keeps one persistent process.
 
 **Memory limit: 768Mi minimum.** Two Node.js processes run inside the container (supergateway + the memory server child process), each needing ~256MB heap. 512Mi OOMKills under load. Set `NODE_OPTIONS=--max-old-space-size=256` to cap each process.
 
 **`imagePullPolicy: Always` for `:latest` / `:main` tags.** Kubernetes defaults to `IfNotPresent` for non-`:latest` tags, which will serve a cached old image after a new build. Use `Always` if you track a mutable tag.
+
+**Upstream write atomicity.** The upstream `saveGraph()` writes directly to `memory.jsonl` without an atomic rename. If the pod is OOM-killed or evicted mid-write the file can be left in a corrupted state, causing all subsequent tool calls to fail with a JSON parse error. If this happens: copy the file out of the PVC, remove any truncated or concatenated lines, copy it back, and restart the pod. A fix (write-to-tmp then `rename()`) has been proposed upstream.
 
 ## Helm chart
 

@@ -47,10 +47,12 @@ Images are published to `ghcr.io/foxj77/mcp-memory-server` by `.github/workflows
 
 These are non-obvious and have already bitten this project — preserve them when editing `Dockerfile` or example manifests:
 
+- **`MEMORY_FILE_PATH` must be set.** The upstream `@modelcontextprotocol/server-memory` package reads the storage path from this env var only — a positional argv path is silently ignored. Without this var the graph is written to the npm package's `dist/` directory and lost on every pod restart. The `Dockerfile` sets `ENV MEMORY_FILE_PATH=/data/memory.jsonl` as a default; all example manifests set it explicitly. Never remove it.
 - **`--stateful` on supergateway is required.** Stateless mode spawns a new stdio child per HTTP request, which breaks MCP's `initialize` → `tools/call` session continuity. Do not remove this flag.
 - **Memory limit ≥ 768Mi.** Two Node processes run in the container (supergateway + the memory server child); 512Mi OOMKills under load. `NODE_OPTIONS=--max-old-space-size=256` caps each heap.
 - **`imagePullPolicy: Always`** is needed in example manifests because they reference mutable tags (`:latest` / `:main`). Kubernetes' default `IfNotPresent` would serve a stale cached image after a new build.
 - **`--outputTransport streamableHttp`** is the transport kagent and most modern MCP clients expect. SSE is legacy.
+- **Upstream write atomicity caveat.** `saveGraph()` in the upstream package writes directly to `memory.jsonl` without an atomic rename. An OOM-kill or eviction mid-write can corrupt the file, causing all tool calls to fail with a JSON parse error. Recovery: copy the file from the PVC, strip the bad line, copy back, restart the pod.
 
 ## Commit messages — conventional commits (required)
 

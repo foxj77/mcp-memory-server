@@ -42,6 +42,10 @@ spec:
           env:
             - name: NODE_OPTIONS
               value: "--max-old-space-size=256"
+            - name: MEMORY_FILE_PATH
+              # server-memory reads its storage path from this env var only —
+              # the positional argv path is silently ignored by the package.
+              value: "/data/memory.jsonl"
           ports:
             - containerPort: 3000
           readinessProbe:
