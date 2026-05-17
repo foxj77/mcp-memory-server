@@ -1,0 +1,18 @@
+# Trivy CVE suppressions — each entry must document why it is accepted.
+#
+# Review this file when updating the base image or npm packages. Once the
+# underlying fix is pulled in, remove the entry so scanning stays honest.
+
+# CVE-2026-33671: picomatch ReDoS via crafted extglob patterns (HIGH)
+# Fixed in: picomatch 4.0.4 / 3.0.2 / 2.3.2
+#
+# Affected location: /usr/local/lib/node_modules/npm/node_modules/picomatch
+# This is picomatch bundled inside npm — part of the node:26-alpine base image,
+# not a dependency of supergateway or server-memory.
+#
+# npm is not invoked at container runtime. It runs once during `docker build`
+# (the `RUN npm install -g` step) and is otherwise dormant. No user-controlled
+# extglob patterns reach picomatch during normal operation of the MCP server.
+#
+# Resolution: remove this entry once node:26-alpine ships npm with picomatch >=4.0.4.
+CVE-2026-33671
