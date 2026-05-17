@@ -1,0 +1,144 @@
+---
+# Example: Resource Health Recorder Agent
+#
+# A simpler agent that inspects live resource health, looks up prior context
+# from the knowledge graph (read path), then writes updated observations back
+# (write path). Useful as a minimal working example of the full read-write cycle.
+#
+# Verified memory tools used:
+#   - search_nodes   — retrieves prior observations for a resource before updating
+#   - create_entities — creates a new node if none exists
+#   - add_observations — appends new status snapshots to an existing node
+#   - create_relations — links related resources together
+#
+# Prerequisites:
+#   1. mcp-memory-server deployed with kagent.enabled=true (see chart values)
+#   2. A RemoteMCPServer CR named "memory-mcp" reachable in the same namespace
+#   3. A Kubernetes tool server providing k8s_get_resources / k8s_describe_resource
+#      (replace with equivalent tools for non-Kubernetes environments)
+#
+# Adjust the modelConfig and tool server names to match your setup.
+
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: resource-health-recorder
+  namespace: kagent
+spec:
+  type: Declarative
+  description: >
+    Checks the health of a set of resources, reads prior context from the shared
+    knowledge graph, writes updated observations, and returns a health summary.
+  declarative:
+    runtime: go
+    modelConfig: your-model-config   # replace with a ModelConfig CR name
+    systemMessage: |
+      You are a resource health recorder.
+      Your job is to check resource health, consult shared memory for prior
+      context, update the graph with new observations, then report status.
+
+      PROCEDURE:
+
+      Step 1 — Check live resource health
+        - Use your available tools to list or describe the resources you are
+          responsible for monitoring.
+        - For each resource note: kind, namespace, name, current status,
+          any error messages or restart counts.
+
+      Step 2 — Read prior context from memory
+        - For each resource that is unhealthy or degraded:
+            Call search_nodes with "<Kind>/<namespace>/<name>" to see if
+            there is an existing node with prior observations.
+        - This tells you whether the issue is new or recurring.
+
+      Step 3 — Write updated state to memory
+        For each unhealthy resource:
+
+        a) If search_nodes returned no existing node:
+             Call create_entities:
+               entities:
+                 - name: "<Kind>/<namespace>/<name>"
+                   entityType: "UnhealthyResource"
+                   observations:
+                     - "Status: <current observed state>"
+                     - "First seen: <DD Mon YYYY>"
+
+        b) If an existing node was found:
+             Call add_observations:
+               observations:
+                 - entityName: "<Kind>/<namespace>/<name>"
+                   contents:
+                     - "Status update <DD Mon YYYY>: <current observed state>"
+
+        c) If two resources share a common root cause, link them:
+             Call create_relations:
+               relations:
+                 - from: "<resource A>"
+                   to: "<resource B>"
+                   relationType: "related_to"
+
+        For resources that are now healthy but had a prior node:
+             Call add_observations:
+               observations:
+                 - entityName: "<Kind>/<namespace>/<name>"
+                   contents:
+                     - "Recovered <DD Mon YYYY>: resource is now healthy."
+
+        Wait for all memory writes to complete before producing output.
+
+      Step 4 — Report
+        Return a brief status report:
+        - List unhealthy resources with their current state
+        - Note which issues are new vs recurring (based on memory context)
+        - List any resources that recovered since the last check
+        Keep it under 200 words.
+
+    a2aConfig:
+      skills:
+        - id: record-health
+          name: Record Resource Health
+          description: >
+            Check resource health, read prior context from the shared knowledge
+            graph, write updated observations, and return a status report.
+          tags:
+            - health
+            - monitoring
+            - memory
+          examples:
+            - Check and record the health of all monitored resources
+            - Are any of our services newly degraded since last check?
+            - Which issues are recurring vs appearing for the first time?
+
+    deployment:
+      resources:
+        requests:
+          cpu: 20m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+    tools:
+      # Replace with the tool server(s) that inspect resources in your environment.
+      # The memory tools below must remain exactly as shown.
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: your-resource-tool-server   # replace with your tool server name
+          toolNames:
+            - k8s_get_resources       # or equivalent for your environment
+            - k8s_describe_resource   # or equivalent
+
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: memory-mcp
+          toolNames:
+            - search_nodes
+            - create_entities
+            - add_observations
+            - create_relations
+            - open_nodes
+            - read_graph
