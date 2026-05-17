@@ -215,7 +215,14 @@ spec:
 
 ## Verifying your deployment
 
-`tests/smoke-test.sh` exercises all seven MCP tools against a running server and shows you exactly what is being stored and retrieved at each step. Run it after any deployment to confirm the server is healthy and the knowledge graph is persisting correctly.
+Two test scripts are available. Run both after any deployment to confirm the server is healthy and data is persisting correctly.
+
+| Script | What it tests | Requires |
+|--------|--------------|---------|
+| `tests/smoke-test.sh` | All 7 MCP tools respond correctly via the HTTP API | `curl`, `jq` |
+| `tests/persistence-test.sh` | `MEMORY_FILE_PATH` is set, writes land on the volume, data survives a container restart | `docker`, `curl`, `jq` |
+
+`smoke-test.sh` can run against any reachable server (local Docker, Kubernetes port-forward, in-cluster). `persistence-test.sh` requires Docker access and manages its own container lifecycle — it is not suitable for running against an already-running production deployment.
 
 ### Prerequisites
 
@@ -236,11 +243,16 @@ cd mcp-memory-server
 
 ### Running against a local Docker container
 
-Start the container, then run the test:
-
 ```bash
+# Start the container
 docker run -d -p 3000:3000 -v $(pwd)/data:/data ghcr.io/foxj77/mcp-memory-server:latest
+
+# Smoke test — exercises all 7 MCP tools
 ./tests/smoke-test.sh
+
+# Persistence test — verifies volume writes and restart survival
+# (manages its own container; do not run against the container above)
+./tests/persistence-test.sh
 ```
 
 ### Running against a Kubernetes deployment

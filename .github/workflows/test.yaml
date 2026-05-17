@@ -1,8 +1,14 @@
 name: Integration Test
 
 # Builds the image from the current Dockerfile, starts it, and runs the smoke
-# test against it. Also lints and templates the Helm chart.
+# test and persistence test against it. Also lints and templates the Helm chart.
 # Catches regressions before a release PR is merged.
+#
+# Jobs:
+#   smoke-test        — exercises all 7 MCP tools via the HTTP API
+#   persistence-test  — verifies MEMORY_FILE_PATH, volume writes, and restart
+#                       survival (catches the class of bug shipped in <v0.2.3)
+#   helm-test         — lint, template, and schema validation for the Helm chart
 
 on:
   push:
@@ -65,6 +71,35 @@ jobs:
         if: failure()
         run: docker logs mcp
 
+  persistence-test:
+    name: Volume persistence test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image (single-arch for speed)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: mcp-memory-server:ci
+          # Shares the GHA layer cache with the smoke-test job — fast rebuild.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run persistence test
+        run: IMAGE=mcp-memory-server:ci ./tests/persistence-test.sh
+
+      - name: Print container logs on failure
+        if: failure()
+        run: |
+          docker logs "$(docker ps -aq --filter name=mcp-persistence)" 2>/dev/null || true
+
   helm-test:
     name: Helm lint and template
     runs-on: ubuntu-latest
@@ -79,7 +114,12 @@ jobs:
         run: helm lint chart/
 
       - name: Template chart (default values)
-        run: helm template mcp-memory-server chart/ --namespace test > /dev/null
+        run: |
+          helm template mcp-memory-server chart/ --namespace test > /tmp/default-render.yaml
+          # MEMORY_FILE_PATH must always be set — removing it silently breaks persistence
+          grep -q "MEMORY_FILE_PATH" /tmp/default-render.yaml
+          grep -q "/data/memory.jsonl" /tmp/default-render.yaml
+          echo "MEMORY_FILE_PATH present in rendered Deployment"
 
       - name: Template chart (custom values)
         run: |
