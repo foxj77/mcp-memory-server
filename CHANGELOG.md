@@ -5,6 +5,13 @@ Versions are managed automatically by [release-please](https://github.com/google
 
 <!-- next-release-here -->
 
+## [0.2.6](https://github.com/foxj77/mcp-memory-server/compare/v0.2.5...v0.2.6) (2026-05-20)
+
+
+### Bug Fixes
+
+* invoke installed mcp-server-memory binary directly instead of npx ([3cc788a](https://github.com/foxj77/mcp-memory-server/commit/3cc788a213e46aec4a770a79e580f7b221e39769))
+
 ## [0.2.5](https://github.com/foxj77/mcp-memory-server/compare/v0.2.4...v0.2.5) (2026-05-17)
 
 
