@@ -112,8 +112,26 @@ docker run -d \
 wait_ready "initial start"
 _pass "Container started  (port $PORT → volume $DATA_DIR)"
 
-# ── 2. Verify MEMORY_FILE_PATH is set ────────────────────────────────────────
-_header "2  Verify MEMORY_FILE_PATH environment variable"
+# ── 2. Verify mcp-server-memory binary is pre-installed ──────────────────────
+_header "2  Verify mcp-server-memory binary is pre-installed (not fetched via npx)"
+BIN_PATH=$(docker exec "$CONTAINER" which mcp-server-memory 2>/dev/null || true)
+if [[ -n "$BIN_PATH" ]]; then
+  _pass "mcp-server-memory binary found at $BIN_PATH"
+else
+  _fail "mcp-server-memory binary not found in PATH — image may be relying on npx to fetch it at runtime"
+fi
+
+CMD_JSON=$(docker inspect "$CONTAINER" --format '{{json .Config.Cmd}}' 2>/dev/null)
+if echo "$CMD_JSON" | grep -q '"npx"'; then
+  _fail "Container CMD contains 'npx' — server will attempt a network download on every startup"
+  _info "In air-gapped or restricted-egress environments this causes startup failure."
+  _info "Fix: invoke the globally-installed binary directly (mcp-server-memory)."
+else
+  _pass "Container CMD does not use npx — pre-installed binary will be used at runtime"
+fi
+
+# ── 3. Verify MEMORY_FILE_PATH is set ────────────────────────────────────────
+_header "3  Verify MEMORY_FILE_PATH environment variable"
 ACTUAL_MFP=$(docker exec "$CONTAINER" sh -c 'echo "$MEMORY_FILE_PATH"' 2>/dev/null | tr -d '\r\n')
 if [[ "$ACTUAL_MFP" == "/data/memory.jsonl" ]]; then
   _pass "MEMORY_FILE_PATH=/data/memory.jsonl"
@@ -123,8 +141,8 @@ else
   _info "directory. The API returns success but all data is lost on restart."
 fi
 
-# ── 3. Write an entity ───────────────────────────────────────────────────────
-_header "3  Write entity to knowledge graph"
+# ── 4. Write an entity ───────────────────────────────────────────────────────
+_header "4  Write entity to knowledge graph"
 new_session
 WRITE_RESP=$(mcp_call "create_entities" '{
   "entities": [{
@@ -140,8 +158,8 @@ else
   _fail "create_entities failed: $WRITE_RESP"
 fi
 
-# ── 4. Verify the file landed on the host volume ──────────────────────────────
-_header "4  Verify memory.jsonl written to mounted volume (not inside image)"
+# ── 5. Verify the file landed on the host volume ──────────────────────────────
+_header "5  Verify memory.jsonl written to mounted volume (not inside image)"
 sleep 1   # allow any in-process write to flush
 if [[ -s "$DATA_DIR/memory.jsonl" ]]; then
   BYTES=$(wc -c < "$DATA_DIR/memory.jsonl")
@@ -154,15 +172,15 @@ else
     | while read -r p; do _info "  $p"; done
 fi
 
-# ── 5. Restart the container ─────────────────────────────────────────────────
-_header "5  Restart container  (simulates pod eviction or rollout)"
+# ── 6. Restart the container ─────────────────────────────────────────────────
+_header "6  Restart container  (simulates pod eviction or rollout)"
 _info "The volume survives the restart — data must be there when the server comes back"
 docker restart "$CONTAINER" >/dev/null
 wait_ready "restart"
 _pass "Container restarted successfully"
 
-# ── 6. Verify data survived ──────────────────────────────────────────────────
-_header "6  Verify entity survived container restart"
+# ── 7. Verify data survived ──────────────────────────────────────────────────
+_header "7  Verify entity survived container restart"
 new_session
 READ_RESP=$(mcp_call "open_nodes" '{"names":["persistence-test/canary"]}')
 if echo "$READ_RESP" \
@@ -176,8 +194,8 @@ else
   _info "  not on the volume, so it is lost when the container is replaced."
 fi
 
-# ── 7. Cleanup ───────────────────────────────────────────────────────────────
-_header "7  Cleanup"
+# ── 8. Cleanup ───────────────────────────────────────────────────────────────
+_header "8  Cleanup"
 mcp_call "delete_entities" '{"entityNames":["persistence-test/canary"]}' >/dev/null || true
 _pass "Test entity deleted"
 
