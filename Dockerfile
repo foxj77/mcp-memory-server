@@ -15,4 +15,4 @@ ENV MEMORY_FILE_PATH=/data/memory.jsonl
 #                                    MCP session continuity between initialize and tools/call)
 CMD ["supergateway", "--port", "3000", "--outputTransport", "streamableHttp", \
      "--stateful", "--stdio", \
-     "npx @modelcontextprotocol/server-memory"]
+     "mcp-server-memory"]
